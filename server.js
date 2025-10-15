@@ -1,15 +1,11 @@
-// server.js — Akinator backend (Fireworks) with anti-repeat + hint flow
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
 
-// If Node < 18, uncomment to polyfill fetch
-// global.fetch = global.fetch || ((...args) => import('node-fetch').then(({ default: f }) => f(...args)));
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
 
-// ===== Helpers for anti-repeat =====
 const STOP = new Set('the a an is are was were do does did has have had of to in on for with without about from at by as be been being character person human someone somebody male female man woman guy girl boy child adult old young age big small same similar repeat repeated repeating any'.split(/\s+/));
 function norm(s) { return String(s).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim(); }
 function tokens(s) { return norm(s).split(' ').filter(w => w && !STOP.has(w)); }
@@ -23,14 +19,13 @@ function isRepeat(question, history) {
   for (const h of history) {
     const t = tokens(h.q);
     const sim = jaccard(tq, t);
-    if (sim >= 0.7) return true; // near-duplicate
+    if (sim >= 0.7) return true; 
     const a = norm(question), b = norm(h.q);
-    if (a.includes(b) || b.includes(a)) return true; // containment
+    if (a.includes(b) || b.includes(a)) return true;
   }
   return false;
 }
 
-// ===== Prompt builders =====
 function buildSystem(domain) {
   return [
     'You are an expert reasoning agent playing a 20 Questions (Akinator-style) game.',
@@ -50,7 +45,6 @@ function buildSystem(domain) {
 }
 
 function buildUser({ domain, history, turns, forceFinal, hint }) {
-  // turn structured Q&A into clear logical context
   const structuredFacts = history.map((x, i) => {
     const q = x.q.toLowerCase();
     const a = x.a.toLowerCase();
@@ -83,7 +77,6 @@ function extractJson(text) {
     .replace(/```/g, '')
     .trim();
 
-  // Try to find the largest JSON-like block
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
   if (start === -1 || end === -1) return null;
@@ -93,7 +86,6 @@ function extractJson(text) {
   try {
     return JSON.parse(jsonCandidate);
   } catch (err) {
-    // Attempt a cleanup if commas or quotes are malformed
     const cleaned = jsonCandidate
       .replace(/,\s*([}\]])/g, '$1')
       .replace(/:\s*'([^']*)'/g, (_, p1) => `: "${p1}"`)
@@ -136,7 +128,6 @@ let obj = extractJson(raw);
 
 if (!obj || !obj.type) {
   console.error("Fireworks raw output (unparsed):", raw);
-  // Try asking the model to reformat strictly
   const retry = await fetch("https://api.fireworks.ai/inference/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -183,7 +174,6 @@ app.post('/api/step', async (req, res) => {
         obj.question = String(obj.question || '').slice(0, 200);
         if (!obj.question) throw new Error('Missing question');
         if (isRepeat(obj.question, history)) {
-          // Append a hard constraint and try again
           messages.push({ role: 'system', content: `You repeated: "${obj.question}". Ask a different, non-redundant question focusing on a new attribute. Absolutely avoid re-asking about the same topic.` });
           continue;
         }
@@ -204,7 +194,6 @@ app.post('/api/step', async (req, res) => {
   }
 });
 
-// Serve static last so /api/* never falls through
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found' }));
 
