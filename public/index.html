@@ -51,7 +51,6 @@
       transition: background 0.3s, color 0.3s;
     }
     
-    /* CRT scanline effect - FIXED: Reduced opacity */
     body::before {
       content: '';
       position: fixed;
@@ -61,10 +60,10 @@
       height: 100%;
       background: repeating-linear-gradient(
         0deg,
-        rgba(0, 0, 0, 0.08) 0px,  /* Reduced from 0.15 */
+        rgba(0, 0, 0, 0.08) 0px,  
         transparent 1px,
         transparent 2px,
-        rgba(0, 0, 0, 0.08) 3px   /* Reduced from 0.15 */
+        rgba(0, 0, 0, 0.08) 3px  
       );
       pointer-events: none;
       z-index: 9999;
@@ -76,7 +75,6 @@
       100% { transform: translateY(10px); }
     }
     
-    /* CRT flicker - FIXED: Much slower and less intense */
     body::after {
       content: '';
       position: fixed;
@@ -85,10 +83,10 @@
       width: 100%;
       height: 100%;
       background: var(--bg);
-      opacity: 0.03;  /* Reduced from 0.1 */
+      opacity: 0.03;  
       pointer-events: none;
       z-index: 9998;
-      animation: flicker 8s infinite;  /* Much slower - was 0.15s */
+      animation: flicker 8s infinite;  
     }
     
     @keyframes flicker {
@@ -139,7 +137,7 @@
       z-index: -1;
     }
     
-    /* Theme toggle button */
+ 
     .theme-toggle {
       position: fixed;
       top: 20px;
@@ -352,7 +350,7 @@
       );
     }
 
-    /* Assist modal */
+   
     .modal { 
       position: fixed; 
       inset: 0; 
@@ -427,7 +425,6 @@
       pointer-events: none;
     }
     
-    /* Pixel perfect borders */
     .card::after,
     .qwrap::after,
     .modal .panel::after {
@@ -489,7 +486,7 @@
     </div>
   </div>
 
-  <!-- Assist Modal @ Q15 -->
+
   <div id="assist" class="modal" role="dialog" aria-modal="true">
     <div class="panel">
       <h3>We've reached question 15</h3>
@@ -524,7 +521,6 @@
 
     const state = { domain: 'character', history: [], question: '', turns: 0, locked: false, pendingGuess: null, pendingHint: '' };
 
-    // Theme toggle functionality
     function setTheme(theme) {
       if (theme === 'light') {
         document.documentElement.setAttribute('data-theme', 'light');
@@ -537,7 +533,7 @@
       }
     }
 
-    // Initialize theme (default to dark)
+
     const savedTheme = localStorage.getItem('theme') || 'dark';
     setTheme(savedTheme);
 
@@ -590,7 +586,7 @@
     async function answer(a) {
       if (!state.question) return;
 
-      // Accept a correct guess
+
       if (state.pendingGuess && (a === 'yes' || a === 'probably')) {
         const msg = `🎉 I win! It was ${state.pendingGuess.guess}.`;
         setStatus(msg); els.q.textContent = msg; els.qa.style.display = 'none';
@@ -598,7 +594,7 @@
         return;
       }
 
-      // Rejected guess: continue asking (never give up automatically)
+
       if (state.pendingGuess) {
         state.history.push({ q: state.question, a }); state.turns++; renderHistory(); updateProgress();
         state.pendingGuess = null;
@@ -607,14 +603,12 @@
         return step();
       }
 
-      // Normal question answered
       state.history.push({ q: state.question, a }); state.turns++; renderHistory(); updateProgress();
       if (state.turns === 15) return openAssist();
       if (state.turns >= 20) return step({ forceFinal: true });
       return step();
     }
 
-    // Events
     els.start.onclick = () => {
       state.domain = els.domain.value;
       state.history = []; state.turns = 0; state.question=''; state.pendingGuess=null; state.pendingHint='';
