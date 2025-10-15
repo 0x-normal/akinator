@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Akinator — Play vs AI</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    
+    :root {
+      --bg: #010101;
+      --fg: #e8e3d5;
+      --muted: #a8a59a;
+      --card: #1a1a1a;
+      --card2: #0a0a0a;
+      --border: #e8e3d5;
+      --accent: #e8e3d5;
+      --accent2: #c8c3b5;
+      --ok: #e8e3d5;
+      --warn: #e8e3d5;
+      --err: #e8e3d5;
+    }
+    
+    [data-theme="light"] {
+      --bg: #e8e3d5;
+      --fg: #010101;
+      --muted: #4a4a4a;
+      --card: #f8f3e5;
+      --card2: #f0ebe0;
+      --border: #010101;
+      --accent: #010101;
+      --accent2: #2a2a2a;
+      --ok: #010101;
+      --warn: #010101;
+      --err: #010101;
+    }
+    
+    * { box-sizing: border-box; }
+    html,body { height:100%; }
+    body { 
+      margin:0; 
+      background: 
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 2px),
+        repeating-linear-gradient(90deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 2px),
+        var(--bg);
+      background-size: 4px 4px, 4px 4px, 100% 100%;
+      color:var(--fg); 
+      font-family: 'Press Start 2P', cursive;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      transition: background 0.3s, color 0.3s;
+    }
+    
+    /* CRT scanline effect - FIXED: Reduced opacity */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.08) 0px,  /* Reduced from 0.15 */
+        transparent 1px,
+        transparent 2px,
+        rgba(0, 0, 0, 0.08) 3px   /* Reduced from 0.15 */
+      );
+      pointer-events: none;
+      z-index: 9999;
+      animation: scanline 8s linear infinite;
+    }
+    
+    @keyframes scanline {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(10px); }
+    }
+    
+    /* CRT flicker - FIXED: Much slower and less intense */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      opacity: 0.03;  /* Reduced from 0.1 */
+      pointer-events: none;
+      z-index: 9998;
+      animation: flicker 8s infinite;  /* Much slower - was 0.15s */
+    }
+    
+    @keyframes flicker {
+      0%, 100% { opacity: 0.02; }
+      5% { opacity: 0.03; }
+      10% { opacity: 0.02; }
+      15% { opacity: 0.04; }
+      20% { opacity: 0.01; }
+      25% { opacity: 0.03; }
+      30% { opacity: 0.02; }
+      35% { opacity: 0.03; }
+      40% { opacity: 0.01; }
+      45% { opacity: 0.03; }
+      50% { opacity: 0.04; }
+      55% { opacity: 0.01; }
+      60% { opacity: 0.02; }
+      65% { opacity: 0.03; }
+      70% { opacity: 0.02; }
+      75% { opacity: 0.01; }
+      80% { opacity: 0.03; }
+      85% { opacity: 0.03; }
+      90% { opacity: 0.02; }
+      95% { opacity: 0.01; }
+    }
+    
+    .wrap { max-width: 920px; margin: 0 auto; padding: 28px; position: relative; z-index: 1; }
+    
+    .card { 
+      background: var(--card);
+      border: 4px solid var(--border);
+      border-radius: 0;
+      padding: 24px; 
+      box-shadow: 
+        8px 8px 0 rgba(0,0,0,0.5),
+        inset 0 0 0 2px var(--bg);
+      position: relative;
+      transition: background 0.3s, border 0.3s;
+    }
+    
+    .card::before {
+      content: '';
+      position: absolute;
+      top: -4px;
+      left: -4px;
+      right: -4px;
+      bottom: -4px;
+      background: var(--border);
+      z-index: -1;
+    }
+    
+    /* Theme toggle button */
+    .theme-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 10000;
+      background: var(--accent);
+      color: var(--bg);
+      border: 3px solid var(--border);
+      padding: 12px 16px;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 8px;
+      cursor: pointer;
+      box-shadow: 4px 4px 0 rgba(0,0,0,0.3);
+      transition: all 0.1s;
+    }
+    
+    .theme-toggle:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0 rgba(0,0,0,0.3);
+    }
+    
+    .theme-toggle:active {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+    }
+    
+    h1 { 
+      margin:0; 
+      font-size: 16px; 
+      letter-spacing: 2px; 
+      color: var(--fg);
+      text-shadow: 
+        3px 3px 0 var(--bg),
+        -1px -1px 0 var(--bg),
+        1px -1px 0 var(--bg),
+        -1px 1px 0 var(--bg);
+      animation: textBlink 1.5s infinite;
+    }
+    
+    @keyframes textBlink {
+      0%, 49%, 100% { opacity: 1; }
+      50%, 99% { opacity: 0.8; }
+    }
+    
+    .muted { color: var(--muted); font-size: 8px; margin-top: 8px; }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap: wrap; position: relative; z-index: 1; }
+    
+    select, input, button { 
+      background: var(--bg);
+      color: var(--fg); 
+      border: 3px solid var(--border); 
+      border-radius: 0;
+      padding: 12px 16px; 
+      font-family: 'Press Start 2P', cursive;
+      font-size: 8px;
+      transition: all 0.1s;
+      box-shadow: 4px 4px 0 rgba(0,0,0,0.3);
+    }
+    
+    select:hover, input:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0 rgba(0,0,0,0.3);
+    }
+    
+    select:active, input:active {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+    }
+    
+    button { 
+      cursor: pointer; 
+      position: relative;
+    }
+    
+    button:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0 rgba(0,0,0,0.3);
+    }
+    
+    button:active {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+    }
+    
+    button.primary { 
+      background: var(--accent);
+      color: var(--bg); 
+      border: 3px solid var(--bg);
+      box-shadow: 4px 4px 0 rgba(0,0,0,0.5);
+      animation: buttonPulse 2s infinite;
+    }
+    
+    @keyframes buttonPulse {
+      0%, 100% { box-shadow: 4px 4px 0 rgba(0,0,0,0.5); }
+      50% { box-shadow: 4px 4px 0 rgba(0,0,0,0.5), 0 0 20px var(--accent); }
+    }
+    
+    button.ghost { 
+      background: transparent; 
+      border: 3px dashed var(--warn); 
+      color: var(--warn);
+    }
+    
+    button:disabled { opacity:.4; cursor:not-allowed; transform: none !important; }
+    
+    .pill { 
+      display: inline-flex; 
+      align-items: center; 
+      gap: 8px; 
+      padding: 8px 16px; 
+      border-radius: 0;
+      border: 3px solid var(--fg); 
+      font-size: 8px; 
+      background: var(--bg);
+      box-shadow: 4px 4px 0 rgba(0,0,0,0.3);
+    }
+    
+    .qwrap { 
+      margin-top: 20px; 
+      padding: 20px; 
+      border: 3px solid var(--border);
+      border-radius: 0;
+      background: var(--bg);
+      box-shadow: inset 4px 4px 0 rgba(0,0,0,0.3);
+      position: relative;
+    }
+    
+    .q { 
+      font-size: 10px; 
+      color: var(--ok);
+      line-height: 1.8;
+      text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+    }
+    
+    .answers { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+    .answers button { 
+      padding: 12px 16px; 
+      border-radius: 0;
+      font-size: 8px;
+    }
+    
+    .history { 
+      margin-top: 20px; 
+      max-height: 360px; 
+      overflow: auto; 
+      border: 3px solid var(--border); 
+      border-radius: 0;
+      background: var(--bg);
+      padding: 14px; 
+      font-family: 'Press Start 2P', cursive;
+      font-size: 8px;
+      box-shadow: inset 4px 4px 0 rgba(0,0,0,0.5);
+      position: relative;
+    }
+    
+    .history::-webkit-scrollbar { width: 12px; background: var(--bg); }
+    .history::-webkit-scrollbar-track { background: var(--bg); border: 2px solid var(--border); }
+    .history::-webkit-scrollbar-thumb { background: var(--accent); border: 2px solid var(--bg); }
+    
+    .line { 
+      opacity: .95; 
+      padding: 8px; 
+      border-bottom: 2px dotted var(--border);
+      color: var(--accent);
+      line-height: 1.6;
+    }
+    
+    .line:hover {
+      background: var(--card);
+      animation: lineGlow 0.5s;
+    }
+    
+    @keyframes lineGlow {
+      0%, 100% { opacity: 0.95; }
+      50% { opacity: 1; }
+    }
+    
+    .progress { 
+      height: 16px; 
+      background: var(--bg);
+      border: 3px solid var(--border); 
+      border-radius: 0;
+      overflow: hidden; 
+      box-shadow: inset 3px 3px 0 rgba(0,0,0,0.5);
+      position: relative;
+    }
+    
+    .bar { 
+      height: 100%; 
+      width: 0%; 
+      background: var(--accent);
+      transition: width .3s steps(20, end);
+      box-shadow: 0 0 10px var(--accent);
+      position: relative;
+      image-rendering: pixelated;
+    }
+    
+    .bar::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 4px,
+        rgba(255, 255, 255, 0.3) 4px,
+        rgba(255, 255, 255, 0.3) 8px
+      );
+    }
+
+    /* Assist modal */
+    .modal { 
+      position: fixed; 
+      inset: 0; 
+      display: none; 
+      align-items: center; 
+      justify-content: center; 
+      background: var(--bg);
+      opacity: 0.95;
+      z-index: 1000;
+    }
+    
+    .modal .panel { 
+      width: min(560px, 92vw); 
+      background: var(--card);
+      border: 4px solid var(--border);
+      border-radius: 0;
+      padding: 24px; 
+      box-shadow: 
+        12px 12px 0 rgba(0,0,0,0.7),
+        inset 0 0 0 2px var(--bg);
+      animation: modalSlideIn 0.3s steps(10, end);
+    }
+    
+    @keyframes modalSlideIn {
+      from { 
+        opacity: 0; 
+        transform: translateY(-100px); 
+      }
+      to { 
+        opacity: 1; 
+        transform: translateY(0); 
+      }
+    }
+    
+    .modal h3 { 
+      margin: 0 0 16px; 
+      font-size: 12px; 
+      color: var(--fg);
+      text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+    }
+    
+    .modal p { 
+      margin: 12px 0; 
+      color: var(--muted); 
+      line-height: 1.8;
+      font-size: 8px;
+    }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      25% { transform: translateY(-4px); }
+      50% { transform: translateY(0px); }
+      75% { transform: translateY(4px); }
+    }
+
+    .dobby-img {
+      animation: float 2s steps(8, end) infinite;
+      filter: 
+        contrast(1.2) 
+        brightness(1.1)
+        drop-shadow(0 0 10px var(--accent));
+      image-rendering: pixelated;
+    }
+
+    .dobby-img {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      width: 160px;
+      height: auto;
+      z-index: 10;
+      pointer-events: none;
+    }
+    
+    /* Pixel perfect borders */
+    .card::after,
+    .qwrap::after,
+    .modal .panel::after {
+      content: '';
+      position: absolute;
+      top: -1px;
+      left: -1px;
+      right: -1px;
+      bottom: -1px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <button class="theme-toggle" id="themeToggle">LIGHT MODE</button>
+  <img src="dobby.png" alt="Dobby Akinator" class="dobby-img">
+
+  <div class="wrap">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <h1>Akinator  User vs Dobby</h1>
+          <div class="muted">Model: <code>dobby-mini-unhinged-plus-llama-3-1-8b</code></div>
+        </div>
+        <div class="pill" id="turnpill">Turn 0 / 20</div>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <label>Domain
+          <select id="domain">
+            <option value="character" selected>Character (real or fictional)</option>
+            <option value="object">Object / thing</option>
+            <option value="animal">Animal</option>
+            <option value="place">Place</option>
+          </select>
+        </label>
+        <button id="start" class="primary">Start Game</button>
+        <button id="reset" class="ghost">End Game</button>
+        <span id="status" class="pill">Think of a target and press Start</span>
+      </div>
+
+      <div class="progress" style="margin:10px 0 6px;">
+        <div id="bar" class="bar"></div>
+      </div>
+
+      <div class="qwrap" id="qa" style="display:none;">
+        <div class="q" id="question">…</div>
+        <div class="answers">
+          <button data-a="yes">Yes</button>
+          <button data-a="no">No</button>
+          <button data-a="probably">Probably</button>
+          <button data-a="probably not">Probably not</button>
+          <button data-a="unknown">Don't know</button>
+          <button id="force" class="ghost">Force guess now</button>
+        </div>
+      </div>
+
+      <div class="history" id="history"></div>
+    </div>
+  </div>
+
+  <!-- Assist Modal @ Q15 -->
+  <div id="assist" class="modal" role="dialog" aria-modal="true">
+    <div class="panel">
+      <h3>We've reached question 15</h3>
+      <p>You can keep going, or give the AI a short hint (e.g., "American singer, 2010s pop"). Hints help break loops and avoid repeated topics.</p>
+      <input id="hint" placeholder="Optional hint…" style="width:100%; margin-top:6px;" />
+      <div class="row" style="margin-top:10px; justify-content:flex-end;">
+        <button id="assist-cancel">Keep asking</button>
+        <button id="assist-hint" class="primary">Send hint</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '';
+    const els = {
+      start: document.getElementById('start'),
+      reset: document.getElementById('reset'),
+      domain: document.getElementById('domain'),
+      status: document.getElementById('status'),
+      qa: document.getElementById('qa'),
+      q: document.getElementById('question'),
+      history: document.getElementById('history'),
+      force: document.getElementById('force'),
+      turnpill: document.getElementById('turnpill'),
+      bar: document.getElementById('bar'),
+      assist: document.getElementById('assist'),
+      hint: document.getElementById('hint'),
+      assistCancel: document.getElementById('assist-cancel'),
+      assistHint: document.getElementById('assist-hint'),
+      themeToggle: document.getElementById('themeToggle'),
+    };
+
+    const state = { domain: 'character', history: [], question: '', turns: 0, locked: false, pendingGuess: null, pendingHint: '' };
+
+    // Theme toggle functionality
+    function setTheme(theme) {
+      if (theme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        els.themeToggle.textContent = 'DARK MODE';
+        localStorage.setItem('theme', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        els.themeToggle.textContent = 'LIGHT MODE';
+        localStorage.setItem('theme', 'dark');
+      }
+    }
+
+    // Initialize theme (default to dark)
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    setTheme(savedTheme);
+
+    els.themeToggle.onclick = () => {
+      const currentTheme = document.documentElement.getAttribute('data-theme');
+      setTheme(currentTheme === 'light' ? 'dark' : 'light');
+    };
+
+    function line(text) { const d = document.createElement('div'); d.className='line'; d.textContent = text; els.history.appendChild(d); els.history.scrollTop = els.history.scrollHeight; }
+    function setStatus(s) { els.status.textContent = s; }
+    function updateProgress() {
+      els.turnpill.textContent = `Turn ${state.turns} / 20`;
+      const pct = Math.min(100, (state.turns/20)*100);
+      els.bar.style.width = pct + '%';
+    }
+
+    function renderHistory() {
+      els.history.innerHTML = '';
+      state.history.forEach((x,i) => line(`${String(i+1).padStart(2,'0')}. Q: ${x.q}  A: ${x.a}`));
+    }
+
+    function openAssist() { els.assist.style.display='flex'; els.hint.focus(); }
+    function closeAssist() { els.assist.style.display='none'; }
+
+    async function step({ forceFinal = false } = {}) {
+      if (state.locked) return; state.locked = true;
+      try {
+        setStatus('AI thinking…');
+        const res = await fetch(`${API_BASE}/api/step`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domain: state.domain, history: state.history, turns: state.turns, forceFinal, hint: state.pendingHint })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Request failed');
+
+        if (data.type === 'ask') {
+          state.pendingGuess = null; state.pendingHint='';
+          state.question = data.question; els.q.textContent = data.question; els.qa.style.display = '';
+          setStatus(`Question ${state.turns + 1}`);
+        } else if (data.type === 'guess' || data.type === 'final') {
+          const q = (data.type === 'final') ? `FINAL guess: Is it ${data.guess}?` : `Is it ${data.guess}?`;
+          state.question = q; els.q.textContent = q; els.qa.style.display = '';
+          setStatus(`${data.type.toUpperCase()} (conf: ${((data.confidence||0)*100).toFixed(0)}%)`);
+          state.pendingGuess = { guess: data.guess, final: data.type === 'final' };
+        } else { throw new Error('Bad response'); }
+      } catch (e) { setStatus('Error'); line('⚠ ' + (e.message||'Unknown error')); }
+      finally { state.locked = false; }
+    }
+
+    async function answer(a) {
+      if (!state.question) return;
+
+      // Accept a correct guess
+      if (state.pendingGuess && (a === 'yes' || a === 'probably')) {
+        const msg = `🎉 I win! It was ${state.pendingGuess.guess}.`;
+        setStatus(msg); els.q.textContent = msg; els.qa.style.display = 'none';
+        state.history.push({ q: state.question, a }); renderHistory(); updateProgress();
+        return;
+      }
+
+      // Rejected guess: continue asking (never give up automatically)
+      if (state.pendingGuess) {
+        state.history.push({ q: state.question, a }); state.turns++; renderHistory(); updateProgress();
+        state.pendingGuess = null;
+        if (state.turns >= 20) return step({ forceFinal: true });
+        if (state.turns === 15) return openAssist();
+        return step();
+      }
+
+      // Normal question answered
+      state.history.push({ q: state.question, a }); state.turns++; renderHistory(); updateProgress();
+      if (state.turns === 15) return openAssist();
+      if (state.turns >= 20) return step({ forceFinal: true });
+      return step();
+    }
+
+    // Events
+    els.start.onclick = () => {
+      state.domain = els.domain.value;
+      state.history = []; state.turns = 0; state.question=''; state.pendingGuess=null; state.pendingHint='';
+      els.history.innerHTML = ''; setStatus('Game started. I will ask a question.'); updateProgress();
+      step();
+    };
+    els.reset.onclick = () => {
+      state.history = []; state.turns = 0; state.question=''; state.pendingGuess=null; state.pendingHint='';
+      els.history.innerHTML = ''; els.q.textContent = ''; els.qa.style.display='none'; setStatus('Think of a target and press Start'); updateProgress();
+    };
+    els.force.onclick = () => step({ forceFinal: true });
+
+    els.assistCancel.onclick = () => { closeAssist(); step(); };
+    els.assistHint.onclick = () => { state.pendingHint = els.hint.value.trim().slice(0, 140); closeAssist(); step(); };
+
+    document.querySelectorAll('[data-a]').forEach(btn => btn.onclick = () => answer(btn.getAttribute('data-a')));
+
+    updateProgress();
+  </script>
+</body>
+</html>
